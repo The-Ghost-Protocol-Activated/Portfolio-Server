@@ -9,46 +9,55 @@ import (
 )
 
 func InitDB() (*sql.DB, error) {
-	// Get database configuration from environment variables
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	
-	port := os.Getenv("DB_PORT")
-	if port == "" {
-		port = "5432"
-	}
-	
-	user := os.Getenv("DB_USER")
-	if user == "" {
-		user = "postgres"
-	}
-	
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-	
-	dbname := os.Getenv("DB_NAME")
-	if dbname == "" {
-		dbname = "blogdb"
+	var dsn string
+
+	// Render injects DATABASE_URL for managed Postgres — use it directly when present.
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		dsn = url
+	} else {
+		// Fallback: build DSN from individual variables (local dev).
+		host := os.Getenv("DB_HOST")
+		if host == "" {
+			host = "localhost"
+		}
+
+		port := os.Getenv("DB_PORT")
+		if port == "" {
+			port = "5432"
+		}
+
+		user := os.Getenv("DB_USER")
+		if user == "" {
+			user = "postgres"
+		}
+
+		password := os.Getenv("DB_PASSWORD")
+		if password == "" {
+			password = "postgres"
+		}
+
+		dbname := os.Getenv("DB_NAME")
+		if dbname == "" {
+			dbname = "blogdb"
+		}
+
+		// sslmode=disable is fine for local; Render's DATABASE_URL already
+		// carries the correct sslmode=require parameter.
+		dsn = fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			host, port, user, password, dbname,
+		)
 	}
 
-	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.Ping()
-	if err != nil {
+	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
-	// Run migrations
 	if err := runMigrations(db); err != nil {
 		return nil, err
 	}
