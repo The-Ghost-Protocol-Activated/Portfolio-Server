@@ -11,11 +11,17 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// corsMiddleware adds the necessary headers to allow cross-origin requests
-// from the portfolio served on localhost:8000.
+// corsMiddleware adds the necessary headers to allow cross-origin requests.
+// The allowed origin is read from the ALLOWED_ORIGIN environment variable so
+// it works both locally (http://localhost:8000) and on Render (your live URL).
 func corsMiddleware(next http.Handler) http.Handler {
+	origin := os.Getenv("ALLOWED_ORIGIN")
+	if origin == "" {
+		origin = "http://localhost:8000" // safe default for local dev
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -47,7 +53,7 @@ func main() {
 	r.HandleFunc("/api/posts/{id}", handlers.UpdatePost(database)).Methods("PUT", "OPTIONS")
 	r.HandleFunc("/api/posts/{id}", handlers.DeletePost(database)).Methods("DELETE", "OPTIONS")
 
-	// Health check
+	// Health check — Render can optionally ping this to confirm the service is up
 	r.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
